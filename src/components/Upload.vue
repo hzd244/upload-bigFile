@@ -122,7 +122,20 @@ export default {
     async uploadFile() {
       if (!this.file) return
       const fileChunkList = this.createFileChunk(this.file)
-      this.hash = await this.calculateHash(fileChunkList)
+      let samplingList = this.sampling(this.file)
+
+      // 计算抽样hash
+      console.time()
+      this.hash = await this.calculateHash(samplingList)
+      console.timeEnd()
+      console.log(this.hash)
+
+      // 计算全量hash
+      // console.time()
+      // this.hash = await this.calculateHash(fileChunkList)
+      // console.timeEnd()
+      // console.log(this.hash)
+
       await this.verifyUpload(this.file.name, this.hash)
       if (!this.verifyData.shouldUpload) {
         this.uploaded = true
@@ -161,6 +174,26 @@ export default {
           }
         }
       })
+    },
+    // 抽样
+    sampling(file) {
+      const OFFSET = Math.floor(2 * 1024 * 1024) // 取样范围 2M
+      let index = OFFSET
+      // 头尾全取，中间抽2字节
+      const chunks = [{ file: file.slice(0, index) }]
+      while (index < file.size) {
+        if (index + OFFSET > file.size) {
+          chunks.push({ file: file.slice(index) })
+        } else {
+          const CHUNK_OFFSET = 2
+          chunks.push(
+            { file: file.slice(index, index + 2) },
+            { file: file.slice(index + OFFSET - CHUNK_OFFSET, index + OFFSET) },
+          )
+        }
+        index += OFFSET
+      }
+      return chunks
     },
     // 校验文件是否已存在
     async verifyUpload(fileName, fileHash) {
